@@ -1,0 +1,6 @@
+[submodule "sha3-fpga"]
+	path = sha3-fpga
+	url = https://github.com/kazkojima/sha3-fpga.git
+[submodule "ringoscillator"]
+	path = ringoscillator
+	url = https://github.com/dpiegdon/ringoscillator.git
