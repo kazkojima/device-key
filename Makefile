@@ -17,7 +17,9 @@ KECCAK_RTL := rconst.v round.v f_permutation.v
 KECCAK_SRC := $(foreach f,$(KECCAK_RTL),$(KECCAK_DIRS)/$(f))
 SHA3_SRC := sha3-fpga/sha3.v
 PUF_SRC := puf/puf.v
-MATMLT_SRC := matmlt/matmlt.v
+MAT_DIRS := matrix
+MAT_RTL := matmlt.v matram.v matrom.v
+MAT_SRC := $(foreach f,$(MAT_RTL),$(MAT_DIRS)/$(f))
 GJ_SRC := gj/gjelim.v
 
 PUF_TB_SRC := puf/puf_tb.v
@@ -42,9 +44,9 @@ clean:
 	-rm -f *.log
 	-rm -f *~
 
-top_$(ARCH).json: top.v $(SHA3_SRC) $(KECCAK_SRC) $(PUF_SRC) $(MATMLT_SRC) $(GJ_SRC)
+top_$(ARCH).json: top.v $(SHA3_SRC) $(KECCAK_SRC) $(PUF_SRC) $(MAT_SRC) $(GJ_SRC)
 
-tb.vvp: tb.v $(SHA3_SRC) $(KECCAK_SRC) $(PUF_TB_SRC) $(MATMLT_SRC) $(GJ_SRC)
+tb.vvp: tb.v $(SHA3_SRC) $(KECCAK_SRC) $(PUF_TB_SRC) $(MAT_SRC) $(GJ_SRC)
 	iverilog -s testbench -o $@ $^
 
 sim: tb.vvp
@@ -55,7 +57,7 @@ sim: tb.vvp
 	yosys -Q $(QUIET) -p 'synth_ecp5 -nomux -top $(subst .v,,$<) -json $@' $^
 
 %_ecp5.txtcfg: %_ecp5.json
-	nextpnr-ecp5 $(QUIET) -l $(subst .json,,$<)-pnr.log --ignore-loops --placer sa --$(DEVICE) --package $(PACKAGE) --lpf $(PINCONSTRAINTS) --json $< --textcfg $@
+	nextpnr-ecp5 $(QUIET) -l $(subst .json,,$<)-pnr.log --ignore-loops --placer heap --$(DEVICE) --package $(PACKAGE) --lpf $(PINCONSTRAINTS) --json $< --textcfg $@
 
 %_ecp5.svf: %_ecp5.txtcfg
 	ecppack --svf $@ $<

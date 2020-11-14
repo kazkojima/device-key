@@ -47,7 +47,7 @@ module top(input wire clk,
 
    reg rst;
 
-   reg [127:0] trng_out;
+   wire [127:0] trng_out;
    reg [255:0] pub_b;
 
    wire [255:0] sha3_out;
@@ -72,8 +72,10 @@ module top(input wire clk,
 
    pll_12_50 pll_inst(clk, refclk);
 
+   assign trng_out = 128'h139871fcaa59a6eab6afb399292871e9;
+
    ro_pair_puf #(.NROP(256), .ACC(7), .NDLY(4), .NSTOP(512))
-     puf(.clk(clk), .rst(rst),
+     puf(.clk(refclk), .rst(rst),
 	 .e_v(rop_e_v),
 	 .co_v(rop_co_v),
 	 .req_valid(puf_req_valid),
@@ -83,7 +85,7 @@ module top(input wire clk,
 	 .res_ready(puf_res_ready));
 
    matmlt #(.M(256), .N(128))
-     mm0(.clk(clk), .rst(rst),
+     mm0(.clk(refclk), .rst(rst),
       .x_in(trng_out),
       .mlt_out(mlt_out),
       .req_valid(mlt_req_valid),
@@ -113,7 +115,9 @@ module top(input wire clk,
 	    .res_ready(sha3_res_ready));
 
    reg succ;
+   reg [7:0] mark;
 
+   assign led = ~{ rst, succ, state };
    assign tp0 = &sha3_out;
    assign tp1 = succ;
 
@@ -157,6 +161,7 @@ module top(input wire clk,
 	 gj_res_ready <= 0;
 	 state <= S_INIT;
 	 succ <= 0;
+	 mark <= 0;
 	 mlt_req_valid <= 1;
 	 puf_req_valid <= 0;
 	 gj_req_valid <= 0;
@@ -255,7 +260,6 @@ module top(input wire clk,
 	 sha3_res_ready <= 0;
 	 // for test
 	 sha3_req_valid <= 1;
-	 trng_out <= 128'h139871fcaa59a6eab6afb399292871e9;
       end
       else if (sha3_state == S_SHA3_INIT) begin
 	 sha3_res_ready <= 0;

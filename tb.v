@@ -141,6 +141,7 @@ module testbench;
 	 end
       end
       else if (state == S_MLT_POST) begin
+	 $display($time,,,"mlt_out=%x OK", mlt_out);
 	 pub_b <= mlt_out;
 	 mlt_res_ready <= 1;
 	 state <= S_MLT_END;

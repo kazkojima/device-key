@@ -1,31 +1,3 @@
-module matrix_ram #(parameter M = 256, N = 128, MEM_INIT_FILE = "")
-   (input clk,
-    input wr_en,
-    input [7:0] w_addr,
-    input [7:0] r_addr,
-    input [N:0] w_data,
-    output [N:0] r_data);
-
-   reg [N:0] ram[0:M-1];
-   reg [7:0] r_addr_reg;
-
-   initial begin
-      if (MEM_INIT_FILE != "") begin
-	 $readmemh(MEM_INIT_FILE, ram);
-      end
-   end
-
-   always @(posedge clk) begin
-      r_addr_reg <= r_addr;
-      if (wr_en) begin
-	 ram[w_addr] <= w_data;
-      end
-   end
-
-   assign r_data = ram[r_addr_reg];
-
-endmodule // matrix_ram
-
 module gjelim #(parameter M = 256, N = 128, ACC = 7)
    (input clk,
     input rst,
@@ -72,18 +44,26 @@ module gjelim #(parameter M = 256, N = 128, ACC = 7)
    localparam M_W = 2;
    localparam M_E = 3;
 
-   matrix_ram #(.MEM_INIT_FILE("./PublicMatrix.dat"))
-     xA(.clk(clk),
-	.wr_en(wr_en),
-	.w_addr(w_addr),
-	.r_addr(r_addr),
-	.w_data(w_data),
-	.r_data(r_data));
+   wire [7:0] rom_addr;
+   wire [N-1:0] rom_data;
 
+   matrix_rom #(.MEM_INIT_FILE("./PublicMatrix.dat"))
+     A(.clk(clk),
+       .r_addr(rom_addr),
+       .r_data(rom_data));
+
+   matrix_ram xA(.clk(clk),
+		 .wr_en(wr_en),
+		 .w_addr(w_addr),
+		 .r_addr(r_addr),
+		 .w_data(w_data),
+		 .r_data(r_data));
+
+   assign rom_addr = i[7:0];
    assign r_addr = (state == S_ELIM_STEP4 || state == S_POST_STEP1) ?
 		   idx[7:0] : i[7:0];
    assign w_addr = i[7:0];
-   
+
    genvar b;
 
    generate
@@ -135,8 +115,8 @@ module gjelim #(parameter M = 256, N = 128, ACC = 7)
 	    m_state <= M_E;
 	 end
 	 else if (m_state == M_E) begin
-	    // Read-modify-write
-	    w_data <= { ((x_v & mask_i) ? 1'b1 :1'b0), r_data[N-1:0] };
+	    // Add the input vector bit as the msb.
+	    w_data <= { ((x_v & mask_i) ? 1'b1 :1'b0), rom_data };
 	    m_state <= M_RM;
 	    state <= S_PRELOAD_STEP3;
 	 end
