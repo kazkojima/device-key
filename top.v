@@ -1,34 +1,5 @@
-`timescale 1 ns / 1 ps
-
-module pll_12_50(input clki, output clko);
-    (* ICP_CURRENT="12" *) (* LPF_RESISTOR="8" *) (* MFG_ENABLE_FILTEROPAMP="1" *) (* MFG_GMCREF_SEL="2" *)
-    EHXPLLL #(
-        .PLLRST_ENA("DISABLED"),
-        .INTFB_WAKE("DISABLED"),
-        .STDBY_ENABLE("DISABLED"),
-        .DPHASE_SOURCE("DISABLED"),
-        .CLKOP_FPHASE(0),
-        .CLKOP_CPHASE(11),
-        .OUTDIVIDER_MUXA("DIVA"),
-        .CLKOP_ENABLE("ENABLED"),
-        .CLKOP_DIV(12),
-        .CLKFB_DIV(25),
-        .CLKI_DIV(6),
-        .FEEDBK_PATH("CLKOP")
-    ) pll_i (
-        .CLKI(clki),
-        .CLKFB(clko),
-        .CLKOP(clko),
-        .RST(1'b0),
-        .STDBY(1'b0),
-        .PHASESEL0(1'b0),
-        .PHASESEL1(1'b0),
-        .PHASEDIR(1'b0),
-        .PHASESTEP(1'b0),
-        .PLLWAKESYNC(1'b0),
-        .ENCLKOP(1'b0),
-    );
-endmodule
+// Noisy PUF confidence value width
+`define ACC 7
 
 module top(input wire clk,
            input wire rstn,
@@ -55,7 +26,7 @@ module top(input wire clk,
    reg sha3_res_ready, sha3_req_valid;
 
    wire [255:0] rop_e_v;
-   wire [7*256-1:0] rop_co_v;
+   wire [`ACC*256-1:0] rop_co_v;
    wire puf_req_ready, puf_req_busy, puf_res_valid;
    reg puf_res_ready, puf_req_valid;
 
@@ -70,11 +41,14 @@ module top(input wire clk,
 
    wire refclk;
 
+   // PLL
    pll_12_50 pll_inst(clk, refclk);
 
+   // dummy TRNG
    assign trng_out = 128'h139871fcaa59a6eab6afb399292871e9;
 
-   ro_pair_puf #(.NROP(256), .ACC(7), .NDLY(4), .NSTOP(512))
+   // PUF
+   ro_pair_puf #(.NROP(256), .ACC(`ACC), .NDLY(4), .NSTOP(512))
      puf(.clk(refclk), .rst(rst),
 	 .e_v(rop_e_v),
 	 .co_v(rop_co_v),
@@ -84,6 +58,7 @@ module top(input wire clk,
 	 .res_valid(puf_res_valid),
 	 .res_ready(puf_res_ready));
 
+   // Matrix-vector multipication
    matmlt #(.M(256), .N(128))
      mm0(.clk(refclk), .rst(rst),
       .x_in(trng_out),
@@ -94,7 +69,8 @@ module top(input wire clk,
       .res_valid(mlt_res_valid),
       .res_ready(mlt_res_ready));
 
-   gjelim #(.M(256), .N(128), .ACC(7))
+   // Gauss-Jordan elimination
+   gjelim #(.M(256), .N(128), .ACC(`ACC))
      gj0(.clk(refclk), .rst(rst),
       .x_v(v_in), // b - e
       .co_v(rop_co_v),
@@ -105,6 +81,7 @@ module top(input wire clk,
       .res_valid(gj_res_valid),
       .res_ready(gj_res_ready));
 
+   // SHA3 message digest
    sha3 md0(.clk(refclk), .rst(rst),
 	    .md_in(trng_out),
 	    .md_out(sha3_out),

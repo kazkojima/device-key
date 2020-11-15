@@ -21,10 +21,11 @@ MAT_DIRS := matrix
 MAT_RTL := matmlt.v matram.v matrom.v
 MAT_SRC := $(foreach f,$(MAT_RTL),$(MAT_DIRS)/$(f))
 GJ_SRC := gj/gjelim.v
+PLL_SRC := ecp5/pll.v
 
 PUF_TB_SRC := puf/puf_tb.v
 
-all: $(BITSTREAM) $(TIMINGREPORT)
+all: $(BITSTREAM)
 
 prog: $(BITSTREAM)
 	openocd -f $(ARCH)/ecp5-evn.openocd.conf -c "transport select jtag; init; svf progress quiet $<; exit"
@@ -44,7 +45,7 @@ clean:
 	-rm -f *.log
 	-rm -f *~
 
-top_$(ARCH).json: top.v $(SHA3_SRC) $(KECCAK_SRC) $(PUF_SRC) $(MAT_SRC) $(GJ_SRC)
+top_$(ARCH).json: top.v $(SHA3_SRC) $(KECCAK_SRC) $(PUF_SRC) $(MAT_SRC) $(GJ_SRC) $(PLL_SRC)
 
 tb.vvp: tb.v $(SHA3_SRC) $(KECCAK_SRC) $(PUF_TB_SRC) $(MAT_SRC) $(GJ_SRC)
 	iverilog -s testbench -o $@ $^
@@ -57,7 +58,7 @@ sim: tb.vvp
 	yosys -Q $(QUIET) -p 'synth_ecp5 -nomux -top $(subst .v,,$<) -json $@' $^
 
 %_ecp5.txtcfg: %_ecp5.json
-	nextpnr-ecp5 $(QUIET) -l $(subst .json,,$<)-pnr.log --ignore-loops --placer heap --$(DEVICE) --package $(PACKAGE) --lpf $(PINCONSTRAINTS) --json $< --textcfg $@
+	nextpnr-ecp5 $(QUIET) -l $(subst .json,,$<)-pnr.log --ignore-loops --placer sa --$(DEVICE) --package $(PACKAGE) --lpf $(PINCONSTRAINTS) --json $< --textcfg $@
 
 %_ecp5.svf: %_ecp5.txtcfg
 	ecppack --svf $@ $<
