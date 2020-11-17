@@ -1,5 +1,6 @@
 // Noisy PUF confidence value width
-`define ACC 7
+`define ACC 8
+
 
 module top(input wire clk,
            input wire rstn,
@@ -18,7 +19,14 @@ module top(input wire clk,
 
    reg rst;
 
-   wire [127:0] trng_out;
+   reg [127:0] trng_out;
+   reg trng_valid;
+   reg [3:0] rn_count;
+   wire [15:0] rn_lfsr;
+   wire rn_metastable;
+   wire rn_bit_ready;
+   wire rn_word_ready;
+
    reg [255:0] pub_b;
 
    wire [255:0] sha3_out;
@@ -45,7 +53,10 @@ module top(input wire clk,
    pll_12_50 pll_inst(clk, refclk);
 
    // dummy TRNG
-   assign trng_out = 128'h139871fcaa59a6eab6afb399292871e9;
+   // assign trng_out = 128'h139871fcaa59a6eab6afb399292871e9;
+   // 16-bit TRNG
+   randomized_lfsr rlfsr(clk, rst, rn_bit_ready, rn_word_ready, rn_lfsr,
+			 rn_metastable);
 
    // PUF
    ro_pair_puf #(.NROP(256), .ACC(`ACC), .NDLY(4), .NSTOP(512))
@@ -92,9 +103,8 @@ module top(input wire clk,
 	    .res_ready(sha3_res_ready));
 
    reg succ;
-   reg [7:0] mark;
 
-   assign led = ~{ rst, succ, state };
+   assign led = ~{ trng_valid, succ, state };
    assign tp0 = &sha3_out;
    assign tp1 = succ;
 
@@ -111,6 +121,24 @@ module top(input wire clk,
 	   rst <= 0;
 	 else
 	   rst_count <= rst_count + 1;
+      end
+   end
+
+   // TRNG
+   always @(posedge clk) begin
+      if (rst) begin
+	 rn_count <= 0;
+	 trng_valid <= 0;
+      end
+      else if (!rn_word_ready) begin
+	 // wait
+      end
+      else if (rn_count < 8) begin
+	 rn_count <= rn_count + 1;
+	 trng_out <= { trng_out[127-16:0], rn_lfsr };
+      end
+      else begin
+	 trng_valid <= 1;
       end
    end
 
@@ -138,15 +166,16 @@ module top(input wire clk,
 	 gj_res_ready <= 0;
 	 state <= S_INIT;
 	 succ <= 0;
-	 mark <= 0;
-	 mlt_req_valid <= 1;
+	 mlt_req_valid <= 0;
 	 puf_req_valid <= 0;
 	 gj_req_valid <= 0;
       end
       else if (state == S_INIT) begin
-	 mlt_res_ready <= 0;
-	 mlt_req_valid <= 1;
-	 state <= S_MLT_START;
+	 if (trng_valid) begin
+	    mlt_res_ready <= 0;
+	    mlt_req_valid <= 1;
+	    state <= S_MLT_START;
+	 end
       end
       else if (state == S_MLT_START) begin
 	 if (mlt_req_ready) begin
@@ -235,13 +264,14 @@ module top(input wire clk,
       if (rst) begin
 	 sha3_state <= S_SHA3_INIT;
 	 sha3_res_ready <= 0;
-	 // for test
-	 sha3_req_valid <= 1;
+	 sha3_req_valid <= 0;
       end
       else if (sha3_state == S_SHA3_INIT) begin
-	 sha3_res_ready <= 0;
-	 sha3_req_valid <= 1;
-	 sha3_state <= S_SHA3_START;
+	 if (trng_valid) begin
+	    sha3_res_ready <= 0;
+	    sha3_req_valid <= 1;
+	    sha3_state <= S_SHA3_START;
+	 end
       end
       else if (sha3_state == S_SHA3_START) begin
 	 if (sha3_req_ready) begin

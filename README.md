@@ -14,9 +14,9 @@ Notice that they have their own LICENCE files.
 ## Device utilisation
 
 ```
-Info:          TRELLIS_SLICE: 23601/41820    56%
+Info:          TRELLIS_SLICE: 25790/41820    61%
 Info:             TRELLIS_IO:    21/  365     5%
-Info:                   DCCA:     2/   56     3%
+Info:                   DCCA:     3/   56     5%
 Info:                 DP16KD:    12/  208     5%
 Info:             MULT18X18D:     0/  156     0%
 Info:                 ALU54B:     0/   78     0%
