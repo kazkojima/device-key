@@ -144,6 +144,7 @@ module top(input wire clk,
 
    // Matmlt - PUF - GJElim
    reg [4:0] state;
+   reg puf_state;
    localparam S_INIT = 1;
    localparam S_MLT_START = 2;
    localparam S_MLT_WAIT = 3;
@@ -158,6 +159,8 @@ module top(input wire clk,
    localparam S_GJ_POST = 12;
    localparam S_GJ_END = 13;
    localparam S_END = 14;
+   localparam PUF_PRV = 0; // Provisioning
+   localparam PUF_DRV = 1; // Derivation
    
    always @(posedge refclk) begin
       if (rst) begin
@@ -165,6 +168,7 @@ module top(input wire clk,
 	 puf_res_ready <= 0;
 	 gj_res_ready <= 0;
 	 state <= S_INIT;
+	 puf_state <= PUF_PRV;
 	 succ <= 0;
 	 mlt_req_valid <= 0;
 	 puf_req_valid <= 0;
@@ -212,12 +216,22 @@ module top(input wire clk,
 	 end
       end
       else if (state == S_PUF_POST) begin
-	 pub_b <= pub_b ^ rop_e_v;
+         if (puf_state == PUF_PRV) begin
+            pub_b <= pub_b ^ rop_e_v;
+         end
 	 puf_res_ready <= 1;
 	 state <= S_PUF_END;
 	 end
       else if (state == S_PUF_END) begin
 	 puf_res_ready <= 0;
+	 if (puf_state == PUF_PRV) begin
+	    puf_state <= PUF_DRV;
+	    puf_req_valid <= 1;
+	    state <= S_PUF_START;
+	 end
+	 else begin
+	    puf_state <= PUF_PRV;
+	 end
 	 // Init GJ
 	 v_in <= pub_b ^ rop_e_v;
 	 gj_res_ready <= 0;
